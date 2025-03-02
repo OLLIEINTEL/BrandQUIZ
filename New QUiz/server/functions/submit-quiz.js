@@ -8,8 +8,14 @@ const openai = new OpenAI({
 // Helper function to analyze quiz answers and generate archetype
 async function analyzeQuizResults(answers) {
   try {
+    // Format answers for the prompt
+    const formattedAnswers = answers.map(a => ({
+      question: a.question,
+      answer: a.answerText
+    }));
+
     const prompt = `Based on these quiz answers about a brand, determine their primary brand archetype and provide recommendations:
-${JSON.stringify(answers, null, 2)}
+${JSON.stringify(formattedAnswers, null, 2)}
 
 Please provide the analysis in the following JSON format:
 {
@@ -19,19 +25,29 @@ Please provide the analysis in the following JSON format:
   "recommendations": ["3-4 actionable recommendations"]
 }`;
 
+    console.log('Debug - OpenAI prompt:', prompt);
+
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo", // Using GPT-3.5 Turbo instead of GPT-4 for better availability
+      model: "gpt-3.5-turbo",
       messages: [
-        { role: "system", content: "You are a brand strategy expert specializing in brand archetypes." },
+        { 
+          role: "system", 
+          content: "You are a brand strategy expert specializing in brand archetypes. Analyze the answers and provide insights in the requested JSON format." 
+        },
         { role: "user", content: prompt }
       ],
       temperature: 0.7,
     });
 
     const content = completion.choices[0].message.content;
-    console.log('OpenAI response:', content); // Debug log
+    console.log('Debug - OpenAI response:', content);
 
-    return JSON.parse(content);
+    try {
+      return JSON.parse(content);
+    } catch (parseError) {
+      console.error('Error parsing OpenAI response:', parseError);
+      throw new Error('Failed to parse analysis results. Please try again.');
+    }
   } catch (error) {
     console.error('Error analyzing quiz results:', error);
     throw new Error(`Failed to analyze quiz results: ${error.message}`);

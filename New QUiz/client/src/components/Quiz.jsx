@@ -113,20 +113,25 @@ const Quiz = ({ onSubmit }) => {
           companyName: formData.companyName.trim(),
           websiteUrl: formData.websiteUrl.trim()
         },
-        answers: questions.map((question, index) => ({
-          id: question.id,
-          question: question.text,
-          answer: answers[index],
-          answerText: question.options.find(opt => opt.value === answers[index])?.text || ''
-        })).filter(answer => answer.answer !== null)
+        answers: questions.map((question, index) => {
+          const selectedOption = question.options.find(opt => opt.value === answers[index]);
+          return {
+            id: question.id,
+            question: question.text,
+            answer: answers[index],
+            answerText: selectedOption ? selectedOption.text : ''
+          };
+        }).filter(answer => answer.answer !== null)
       };
       
-      console.log('Debug - Submitting quiz data:', JSON.stringify(quizData, null, 2));
+      console.log('Debug - Quiz data structure:', {
+        metadata: quizData.metadata,
+        answerCount: quizData.answers.length,
+        sampleAnswer: quizData.answers[0]
+      });
       
       // Submit quiz data to the server
       const response = await submitQuiz(quizData);
-      
-      console.log('Debug - Server response:', JSON.stringify(response, null, 2));
       
       if (!response || !response.success) {
         throw new Error(response?.message || 'Failed to process quiz results');
@@ -141,6 +146,8 @@ const Quiz = ({ onSubmit }) => {
       console.error('Error submitting quiz:', error);
       setIsSubmitting(false);
       alert(`Error submitting quiz: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
