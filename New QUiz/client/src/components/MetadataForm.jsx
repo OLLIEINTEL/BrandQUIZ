@@ -13,7 +13,7 @@ const MetadataForm = ({ formData, onChange, errors, submitError }) => {
         </div>
       )}
 
-      <div className="space-y-4">
+      <form className="space-y-4">
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-gray-700">
             Your Name *
@@ -97,7 +97,7 @@ const MetadataForm = ({ formData, onChange, errors, submitError }) => {
             <p className="mt-1 text-sm text-red-600">{errors.websiteUrl}</p>
           )}
         </div>
-      </div>
+      </form>
 
       <p className="mt-4 text-sm text-gray-500">
         * Required fields

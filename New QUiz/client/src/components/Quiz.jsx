@@ -186,7 +186,7 @@ const Quiz = ({ onSubmit }) => {
           submitError={submitError}
         />
         
-        <div className="mt-8 flex justify-between">
+        <div className="mt-8 flex justify-between items-center">
           <button
             type="button"
             className="btn btn-secondary"
@@ -201,7 +201,7 @@ const Quiz = ({ onSubmit }) => {
             onClick={handleSubmit}
             disabled={isSubmitting}
           >
-            Submit
+            {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
           </button>
         </div>
       </div>
@@ -230,7 +230,7 @@ const Quiz = ({ onSubmit }) => {
         onOptionSelect={handleOptionSelect}
       />
       
-      <div className="mt-8 flex justify-between">
+      <div className="mt-8 flex justify-between items-center">
         <button
           type="button"
           className="btn btn-secondary"
