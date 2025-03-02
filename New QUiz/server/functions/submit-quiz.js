@@ -11,7 +11,8 @@ async function analyzeQuizResults(answers) {
     // Format answers for the prompt
     const formattedAnswers = answers.map(a => ({
       question: a.question,
-      answer: a.answerText
+      answer: a.answerText,
+      description: a.description
     }));
 
     const prompt = `Based on these quiz answers about a brand, determine their primary brand archetype and provide recommendations:
@@ -22,7 +23,8 @@ Please provide the analysis in the following JSON format:
   "archetype": "Primary archetype name",
   "description": "Brief description of the archetype",
   "strengths": ["3-4 key strengths"],
-  "recommendations": ["3-4 actionable recommendations"]
+  "recommendations": ["3-4 actionable recommendations"],
+  "traits": ["3-4 key personality traits"]
 }`;
 
     console.log('Debug - OpenAI prompt:', prompt);
@@ -37,19 +39,37 @@ Please provide the analysis in the following JSON format:
         { role: "user", content: prompt }
       ],
       temperature: 0.7,
+      max_tokens: 1000,
+      presence_penalty: 0.3,
+      frequency_penalty: 0.3
     });
 
     const content = completion.choices[0].message.content;
     console.log('Debug - OpenAI response:', content);
 
     try {
-      return JSON.parse(content);
+      const result = JSON.parse(content);
+      
+      // Validate the response structure
+      const requiredFields = ['archetype', 'description', 'strengths', 'recommendations', 'traits'];
+      const missingFields = requiredFields.filter(field => !result[field]);
+      
+      if (missingFields.length > 0) {
+        throw new Error(`OpenAI response missing required fields: ${missingFields.join(', ')}`);
+      }
+
+      return result;
     } catch (parseError) {
       console.error('Error parsing OpenAI response:', parseError);
       throw new Error('Failed to parse analysis results. Please try again.');
     }
   } catch (error) {
     console.error('Error analyzing quiz results:', error);
+    
+    if (error.response?.status === 429) {
+      throw new Error('Service is currently busy. Please try again in a few minutes.');
+    }
+    
     throw new Error(`Failed to analyze quiz results: ${error.message}`);
   }
 }
@@ -77,15 +97,38 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 405,
       headers,
-      body: JSON.stringify({ success: false, message: 'Method not allowed' }),
+      body: JSON.stringify({ 
+        success: false, 
+        message: 'Method not allowed' 
+      }),
     };
   }
 
   try {
+    // Validate OpenAI API key
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('OpenAI API key not configured');
+      throw new Error('Server configuration error');
+    }
+
     console.log('Debug - Received event body:', event.body);
 
-    // Parse the incoming request body
-    const data = JSON.parse(event.body);
+    // Parse and validate the incoming request body
+    let data;
+    try {
+      data = JSON.parse(event.body);
+    } catch (parseError) {
+      console.error('Error parsing request body:', parseError);
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ 
+          success: false, 
+          message: 'Invalid request body format' 
+        }),
+      };
+    }
+
     console.log('Debug - Parsed data:', JSON.stringify(data, null, 2));
 
     const { metadata, answers } = data;
@@ -98,14 +141,18 @@ exports.handler = async (event, context) => {
         headers,
         body: JSON.stringify({ 
           success: false, 
-          message: 'Invalid metadata structure' 
+          message: 'Invalid metadata format' 
         }),
       };
     }
 
     // Validate required metadata fields
     const requiredMetadataFields = ['name', 'email', 'companyName', 'websiteUrl'];
-    const missingFields = requiredMetadataFields.filter(field => !metadata[field] || typeof metadata[field] !== 'string' || !metadata[field].trim());
+    const missingFields = requiredMetadataFields.filter(field => 
+      !metadata[field] || 
+      typeof metadata[field] !== 'string' || 
+      !metadata[field].trim()
+    );
     
     if (missingFields.length > 0) {
       console.error('Missing or invalid metadata fields:', missingFields);
@@ -115,6 +162,32 @@ exports.handler = async (event, context) => {
         body: JSON.stringify({ 
           success: false, 
           message: `Missing or invalid metadata fields: ${missingFields.join(', ')}` 
+        }),
+      };
+    }
+
+    // Validate email format
+    const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+    if (!emailRegex.test(metadata.email)) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ 
+          success: false, 
+          message: 'Invalid email format' 
+        }),
+      };
+    }
+
+    // Validate website URL format
+    const urlRegex = /^https?:\/\/.+\..+/;
+    if (!urlRegex.test(metadata.websiteUrl)) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ 
+          success: false, 
+          message: 'Invalid website URL format' 
         }),
       };
     }
@@ -133,12 +206,11 @@ exports.handler = async (event, context) => {
     }
 
     // Validate each answer object
+    const requiredAnswerFields = ['id', 'question', 'answer', 'answerText'];
     const invalidAnswers = answers.filter(answer => 
-      !answer.id || !answer.question || !answer.answer || !answer.answerText ||
-      typeof answer.id !== 'string' || 
-      typeof answer.question !== 'string' || 
-      typeof answer.answer !== 'string' || 
-      typeof answer.answerText !== 'string'
+      !answer || 
+      typeof answer !== 'object' ||
+      requiredAnswerFields.some(field => !answer[field] || typeof answer[field] !== 'string')
     );
 
     if (invalidAnswers.length > 0) {
@@ -167,7 +239,7 @@ exports.handler = async (event, context) => {
         websiteUrl: metadata.websiteUrl.trim()
       },
       result: analysis,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
 
     return {
@@ -178,6 +250,29 @@ exports.handler = async (event, context) => {
 
   } catch (error) {
     console.error('Error processing quiz submission:', error);
+
+    // Handle specific error types
+    if (error.message.includes('Server configuration error')) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          message: 'Server configuration error. Please contact support.'
+        }),
+      };
+    }
+
+    if (error.message.includes('Service is currently busy')) {
+      return {
+        statusCode: 429,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          message: error.message
+        }),
+      };
+    }
 
     return {
       statusCode: 500,

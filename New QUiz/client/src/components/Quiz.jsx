@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import Question from './Question';
 import ProgressBar from './ProgressBar';
 import MetadataForm from './MetadataForm';
@@ -18,147 +18,162 @@ const Quiz = ({ onSubmit }) => {
   });
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
 
-  const handleOptionSelect = (optionId) => {
-    const newAnswers = [...answers];
-    newAnswers[currentQuestionIndex] = optionId;
-    setAnswers(newAnswers);
-  };
+  const handleOptionSelect = useCallback((optionId) => {
+    setAnswers(prev => {
+      const newAnswers = [...prev];
+      newAnswers[currentQuestionIndex] = optionId;
+      return newAnswers;
+    });
+    // Clear any previous submit error when user makes a selection
+    setSubmitError(null);
+  }, [currentQuestionIndex]);
 
-  const handleNext = () => {
-    // If we're on the last question and have an answer, show the metadata form
+  const handleNext = useCallback(() => {
     if (currentQuestionIndex === questions.length - 1) {
+      const unansweredIndex = answers.findIndex(answer => answer === null);
+      if (unansweredIndex !== -1) {
+        setCurrentQuestionIndex(unansweredIndex);
+        setSubmitError(`Please answer question ${unansweredIndex + 1} before proceeding.`);
+        return;
+      }
       setShowMetadataForm(true);
     } else {
-      // Otherwise, go to the next question
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setCurrentQuestionIndex(prev => prev + 1);
     }
-  };
+  }, [currentQuestionIndex, answers]);
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
+    setSubmitError(null); // Clear any error when going back
     if (showMetadataForm) {
       setShowMetadataForm(false);
     } else if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
+      setCurrentQuestionIndex(prev => prev - 1);
     }
-  };
+  }, [showMetadataForm, currentQuestionIndex]);
 
-  const handleFormChange = (e) => {
+  const handleFormChange = useCallback((e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-    
-    // Clear error for this field if it exists
-    if (formErrors[name]) {
-      setFormErrors({
-        ...formErrors,
-        [name]: null,
-      });
-    }
-  };
+    setFormData(prev => ({
+      ...prev,
+      [name]: value.trim(),
+    }));
+    // Clear related error
+    setFormErrors(prev => ({
+      ...prev,
+      [name]: null,
+    }));
+    setSubmitError(null);
+  }, []);
 
-  const validateForm = () => {
+  const validateForm = useCallback(() => {
     const errors = {};
+    const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+    const urlRegex = /^https?:\/\/.+\..+/;
     
-    if (!formData.name.trim()) {
+    if (!formData.name) {
       errors.name = 'Name is required';
     }
     
-    if (!formData.email.trim()) {
+    if (!formData.email) {
       errors.email = 'Email is required';
-    } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(formData.email)) {
+    } else if (!emailRegex.test(formData.email)) {
       errors.email = 'Invalid email address';
     }
     
-    if (!formData.companyName.trim()) {
+    if (!formData.companyName) {
       errors.companyName = 'Company name is required';
     }
     
-    if (!formData.websiteUrl.trim()) {
+    if (!formData.websiteUrl) {
       errors.websiteUrl = 'Website URL is required';
-    } else if (!/^https?:\/\/.+\..+/.test(formData.websiteUrl)) {
+    } else if (!urlRegex.test(formData.websiteUrl)) {
       errors.websiteUrl = 'Please enter a valid URL (e.g., https://example.com)';
     }
     
     return errors;
-  };
+  }, [formData]);
+
+  const prepareQuizData = useCallback(() => {
+    // Validate all questions are answered
+    const unansweredIndex = answers.findIndex(answer => answer === null);
+    if (unansweredIndex !== -1) {
+      throw new Error(`Please answer question ${unansweredIndex + 1} before submitting.`);
+    }
+
+    const metadata = {
+      name: formData.name,
+      email: formData.email,
+      companyName: formData.companyName,
+      websiteUrl: formData.websiteUrl
+    };
+
+    const quizAnswers = questions.map((question, index) => {
+      const selectedOption = question.options.find(opt => opt.value === answers[index]);
+      if (!selectedOption) {
+        throw new Error(`Invalid answer for question: ${question.text}`);
+      }
+      return {
+        id: question.id,
+        question: question.text,
+        answer: selectedOption.value,
+        answerText: selectedOption.text,
+        description: selectedOption.description || ''
+      };
+    });
+
+    return { metadata, answers: quizAnswers };
+  }, [formData, answers]);
 
   const handleSubmit = async () => {
-    const validationErrors = validateForm();
-    
-    if (Object.keys(validationErrors).length > 0) {
-      setFormErrors(validationErrors);
-      return;
-    }
-
-    // Validate that all questions have been answered
-    const unansweredQuestions = answers.findIndex(answer => answer === null);
-    if (unansweredQuestions !== -1) {
-      alert(`Please answer all questions before submitting. Question ${unansweredQuestions + 1} is unanswered.`);
-      setShowMetadataForm(false);
-      setCurrentQuestionIndex(unansweredQuestions);
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
     try {
-      // Prepare quiz data with answers mapped to their corresponding questions
-      const quizData = {
-        metadata: {
-          name: formData.name.trim(),
-          email: formData.email.trim(),
-          companyName: formData.companyName.trim(),
-          websiteUrl: formData.websiteUrl.trim()
-        },
-        answers: questions.map((question, index) => {
-          const selectedOption = question.options.find(opt => opt.value === answers[index]);
-          return {
-            id: question.id,
-            question: question.text,
-            answer: answers[index],
-            answerText: selectedOption ? selectedOption.text : ''
-          };
-        }).filter(answer => answer.answer !== null)
-      };
+      setSubmitError(null);
+      setFormErrors({});
       
-      console.log('Debug - Quiz data structure:', {
-        metadata: quizData.metadata,
-        answerCount: quizData.answers.length,
-        sampleAnswer: quizData.answers[0]
-      });
+      // Validate form data
+      const validationErrors = validateForm();
+      if (Object.keys(validationErrors).length > 0) {
+        setFormErrors(validationErrors);
+        return;
+      }
+
+      setIsSubmitting(true);
       
-      // Submit quiz data to the server
+      // Prepare and validate quiz data
+      const quizData = prepareQuizData();
+      console.log('Debug - Submitting quiz data:', JSON.stringify(quizData, null, 2));
+      
       const response = await submitQuiz(quizData);
       
-      if (!response || !response.success) {
+      if (!response?.success) {
         throw new Error(response?.message || 'Failed to process quiz results');
       }
       
-      // Call the completion handler with the response
+      // Call the parent's onSubmit with the complete data
       onSubmit({
-        ...formData,
+        metadata: quizData.metadata,
         result: response.result
       });
     } catch (error) {
       console.error('Error submitting quiz:', error);
-      setIsSubmitting(false);
-      alert(`Error submitting quiz: ${error.message}`);
+      setSubmitError(error.message);
+      
+      // If it's a missing answer error, go back to the questions
+      if (error.message.includes('Please answer question')) {
+        setShowMetadataForm(false);
+        const questionNum = parseInt(error.message.match(/question (\d+)/)?.[1] || '1');
+        setCurrentQuestionIndex(questionNum - 1);
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // If currently submitting, show loading spinner
   if (isSubmitting) {
-    return (
-      <LoadingSpinner message="Generating your personalized brand report..." />
-    );
+    return <LoadingSpinner message="Analyzing your brand archetype..." />;
   }
 
-  // If showing metadata form
   if (showMetadataForm) {
     return (
       <div className="bg-white shadow rounded-lg p-6">
@@ -167,7 +182,8 @@ const Quiz = ({ onSubmit }) => {
         <MetadataForm 
           formData={formData} 
           onChange={handleFormChange} 
-          errors={formErrors} 
+          errors={formErrors}
+          submitError={submitError}
         />
         
         <div className="mt-8 flex justify-between">
@@ -183,6 +199,7 @@ const Quiz = ({ onSubmit }) => {
             type="button"
             className="btn btn-primary"
             onClick={handleSubmit}
+            disabled={isSubmitting}
           >
             Submit
           </button>
@@ -191,10 +208,8 @@ const Quiz = ({ onSubmit }) => {
     );
   }
 
-  // Otherwise, show the current question
   const currentQuestion = questions[currentQuestionIndex];
   const currentAnswer = answers[currentQuestionIndex];
-  const isLastQuestion = currentQuestionIndex === questions.length - 1;
 
   return (
     <div className="bg-white shadow rounded-lg p-6">
@@ -202,6 +217,12 @@ const Quiz = ({ onSubmit }) => {
         currentQuestion={currentQuestionIndex + 1} 
         totalQuestions={questions.length} 
       />
+      
+      {submitError && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+          <p className="text-sm text-red-600">{submitError}</p>
+        </div>
+      )}
       
       <Question
         question={currentQuestion}
@@ -225,7 +246,7 @@ const Quiz = ({ onSubmit }) => {
           onClick={handleNext}
           disabled={!currentAnswer}
         >
-          {isLastQuestion ? 'Next' : 'Next'}
+          {currentQuestionIndex === questions.length - 1 ? 'Next' : 'Next'}
         </button>
       </div>
     </div>
