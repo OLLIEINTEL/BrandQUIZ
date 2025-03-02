@@ -6,7 +6,7 @@ import LoadingSpinner from './LoadingSpinner';
 import questions from '../data/questions';
 import { submitQuiz } from '../utils/api';
 
-const Quiz = ({ onComplete }) => {
+const Quiz = ({ onSubmit }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState(Array(questions.length).fill(null));
   const [showMetadataForm, setShowMetadataForm] = useState(false);
@@ -109,7 +109,7 @@ const Quiz = ({ onComplete }) => {
       const response = await submitQuiz(quizData);
       
       // Call the completion handler with the response
-      onComplete({
+      onSubmit({
         ...formData,
         result: response,
       });
