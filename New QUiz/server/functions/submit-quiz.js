@@ -1,10 +1,9 @@
-const { Configuration, OpenAIApi } = require('openai');
+const OpenAI = require('openai');
 
-// Initialize OpenAI
-const configuration = new Configuration({
+// Initialize OpenAI with the latest SDK
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-const openai = new OpenAIApi(configuration);
 
 // Helper function to analyze quiz answers and generate archetype
 async function analyzeQuizResults(answers) {
@@ -20,40 +19,68 @@ Please provide the analysis in the following JSON format:
   "recommendations": ["3-4 actionable recommendations"]
 }`;
 
-    const completion = await openai.createChatCompletion({
-      model: "gpt-4",
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo", // Using GPT-3.5 Turbo instead of GPT-4 for better availability
       messages: [
         { role: "system", content: "You are a brand strategy expert specializing in brand archetypes." },
         { role: "user", content: prompt }
       ],
+      temperature: 0.7,
     });
 
-    return JSON.parse(completion.data.choices[0].message.content);
+    const content = completion.choices[0].message.content;
+    console.log('OpenAI response:', content); // Debug log
+
+    return JSON.parse(content);
   } catch (error) {
     console.error('Error analyzing quiz results:', error);
-    throw new Error('Failed to analyze quiz results');
+    throw new Error(`Failed to analyze quiz results: ${error.message}`);
   }
 }
 
 exports.handler = async (event, context) => {
+  // Add CORS headers
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Content-Type': 'application/json'
+  };
+
+  // Handle OPTIONS request (preflight)
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers,
+      body: ''
+    };
+  }
+
   // Only allow POST requests
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
-      body: JSON.stringify({ message: 'Method not allowed' }),
+      headers,
+      body: JSON.stringify({ success: false, message: 'Method not allowed' }),
     };
   }
 
   try {
+    console.log('Received event body:', event.body); // Debug log
+
     // Parse the incoming request body
     const data = JSON.parse(event.body);
     const { metadata, answers } = data;
 
     // Validate required fields
-    if (!metadata || !answers) {
+    if (!metadata || !answers || !Array.isArray(answers)) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ message: 'Missing required fields' }),
+        headers,
+        body: JSON.stringify({ 
+          success: false, 
+          message: 'Missing or invalid required fields' 
+        }),
       };
     }
 
@@ -70,9 +97,7 @@ exports.handler = async (event, context) => {
 
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(response),
     };
 
@@ -81,9 +106,11 @@ exports.handler = async (event, context) => {
 
     return {
       statusCode: 500,
+      headers,
       body: JSON.stringify({
+        success: false,
         message: 'Error processing quiz submission',
-        error: error.message,
+        error: error.message
       }),
     };
   }
