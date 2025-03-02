@@ -98,26 +98,35 @@ const Quiz = ({ onSubmit }) => {
     try {
       // Prepare quiz data with answers mapped to their corresponding questions
       const quizData = {
+        metadata: formData,
         answers: answers.map((answer, index) => ({
           questionId: questions[index].id,
-          optionId: answer,
-        })),
-        metadata: formData,
+          questionText: questions[index].text,
+          selectedOption: answer,
+          selectedOptionText: questions[index].options.find(opt => opt.value === answer)?.text || ''
+        }))
       };
+      
+      console.log('Submitting quiz data:', quizData); // Debug log
       
       // Submit quiz data to the server
       const response = await submitQuiz(quizData);
       
+      console.log('Server response:', response); // Debug log
+      
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to process quiz results');
+      }
+      
       // Call the completion handler with the response
       onSubmit({
         ...formData,
-        result: response,
+        result: response.result
       });
     } catch (error) {
       console.error('Error submitting quiz:', error);
       setIsSubmitting(false);
-      // Display error message to user (you might want to add a more user-friendly message)
-      alert('There was an error submitting your quiz. Please try again.');
+      alert(error.message || 'There was an error submitting your quiz. Please try again.');
     }
   };
 

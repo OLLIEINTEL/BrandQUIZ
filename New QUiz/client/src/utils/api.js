@@ -7,32 +7,29 @@ const API_BASE_URL = import.meta.env.PROD
 
 /**
  * Submit quiz results to the API
- * @param {Object} metadata User metadata
- * @param {Object} quizResults Quiz answers and results
+ * @param {Object} quizData Object containing metadata and answers
  * @returns {Promise} API response
  */
-export const submitQuiz = async (metadata, quizResults) => {
+export const submitQuiz = async (quizData) => {
   try {
     const response = await fetch(`${API_BASE_URL}/submit-quiz`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        metadata,
-        answers: quizResults,
-      }),
+      body: JSON.stringify(quizData),
     });
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('Server error:', errorData);
       throw new Error(errorData.message || `Failed to submit quiz results: ${response.status}`);
     }
     
     return response.json();
   } catch (error) {
     console.error('Quiz submission error:', error);
-    throw new Error('Failed to submit quiz. Please try again.');
+    throw error; // Propagate the error with its original message
   }
 };
 
@@ -47,13 +44,14 @@ export const checkReportStatus = async (reportId) => {
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('Server error:', errorData);
       throw new Error(errorData.message || `Failed to check report status: ${response.status}`);
     }
     
     return response.json();
   } catch (error) {
     console.error('Status check error:', error);
-    throw new Error('Failed to check report status. Please try again.');
+    throw error; // Propagate the error with its original message
   }
 };
 
