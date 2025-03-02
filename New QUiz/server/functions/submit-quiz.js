@@ -66,26 +66,58 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    console.log('Received event body:', event.body); // Debug log
+    console.log('Debug - Received event body:', event.body); // Debug log
 
     // Parse the incoming request body
     const data = JSON.parse(event.body);
+    console.log('Debug - Parsed data:', JSON.stringify(data, null, 2));
+
     const { metadata, answers } = data;
 
-    // Validate required fields
-    if (!metadata || !answers || !Array.isArray(answers)) {
+    // Enhanced validation
+    if (!metadata || typeof metadata !== 'object') {
+      console.error('Invalid metadata:', metadata);
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({ 
           success: false, 
-          message: 'Missing or invalid required fields' 
+          message: 'Invalid metadata format' 
+        }),
+      };
+    }
+
+    if (!answers || !Array.isArray(answers) || answers.length === 0) {
+      console.error('Invalid answers:', answers);
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ 
+          success: false, 
+          message: 'Invalid answers format or empty answers array' 
+        }),
+      };
+    }
+
+    // Validate required metadata fields
+    const requiredMetadataFields = ['name', 'email', 'companyName', 'websiteUrl'];
+    const missingFields = requiredMetadataFields.filter(field => !metadata[field]);
+    
+    if (missingFields.length > 0) {
+      console.error('Missing metadata fields:', missingFields);
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ 
+          success: false, 
+          message: `Missing required metadata fields: ${missingFields.join(', ')}` 
         }),
       };
     }
 
     // Analyze the quiz results
     const analysis = await analyzeQuizResults(answers);
+    console.log('Debug - Analysis result:', JSON.stringify(analysis, null, 2));
 
     // Prepare the response
     const response = {
@@ -110,7 +142,8 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         success: false,
         message: 'Error processing quiz submission',
-        error: error.message
+        error: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       }),
     };
   }

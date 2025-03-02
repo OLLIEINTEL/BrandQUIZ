@@ -92,30 +92,44 @@ const Quiz = ({ onSubmit }) => {
       setFormErrors(validationErrors);
       return;
     }
+
+    // Validate that all questions have been answered
+    const unansweredQuestions = answers.findIndex(answer => answer === null);
+    if (unansweredQuestions !== -1) {
+      alert(`Please answer all questions before submitting. Question ${unansweredQuestions + 1} is unanswered.`);
+      setShowMetadataForm(false);
+      setCurrentQuestionIndex(unansweredQuestions);
+      return;
+    }
     
     setIsSubmitting(true);
     
     try {
       // Prepare quiz data with answers mapped to their corresponding questions
       const quizData = {
-        metadata: formData,
-        answers: answers.map((answer, index) => ({
-          questionId: questions[index].id,
-          questionText: questions[index].text,
-          selectedOption: answer,
-          selectedOptionText: questions[index].options.find(opt => opt.value === answer)?.text || ''
-        }))
+        metadata: {
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          companyName: formData.companyName.trim(),
+          websiteUrl: formData.websiteUrl.trim()
+        },
+        answers: questions.map((question, index) => ({
+          id: question.id,
+          question: question.text,
+          answer: answers[index],
+          answerText: question.options.find(opt => opt.value === answers[index])?.text || ''
+        })).filter(answer => answer.answer !== null)
       };
       
-      console.log('Submitting quiz data:', quizData); // Debug log
+      console.log('Debug - Submitting quiz data:', JSON.stringify(quizData, null, 2));
       
       // Submit quiz data to the server
       const response = await submitQuiz(quizData);
       
-      console.log('Server response:', response); // Debug log
+      console.log('Debug - Server response:', JSON.stringify(response, null, 2));
       
-      if (!response.success) {
-        throw new Error(response.message || 'Failed to process quiz results');
+      if (!response || !response.success) {
+        throw new Error(response?.message || 'Failed to process quiz results');
       }
       
       // Call the completion handler with the response
@@ -126,7 +140,7 @@ const Quiz = ({ onSubmit }) => {
     } catch (error) {
       console.error('Error submitting quiz:', error);
       setIsSubmitting(false);
-      alert(error.message || 'There was an error submitting your quiz. Please try again.');
+      alert(`Error submitting quiz: ${error.message}`);
     }
   };
 
