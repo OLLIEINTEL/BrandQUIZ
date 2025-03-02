@@ -1,8 +1,13 @@
 import React from 'react';
 
-const MetadataForm = ({ formData, onChange, errors }) => {
+const MetadataForm = ({ formData, onChange, errors, onSubmit }) => {
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit(formData);
+  };
+
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm">
+    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-sm">
       <h2 className="text-xl font-semibold text-gray-900 mb-6">
         Almost there! Tell us about your brand
       </h2>
@@ -17,7 +22,9 @@ const MetadataForm = ({ formData, onChange, errors }) => {
             name="name"
             value={formData.name}
             onChange={onChange}
-            className="mt-1 input"
+            className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm ${
+              errors.name ? 'border-red-300' : ''
+            }`}
             required
           />
           {errors.name && (
@@ -35,7 +42,9 @@ const MetadataForm = ({ formData, onChange, errors }) => {
             name="email"
             value={formData.email}
             onChange={onChange}
-            className="mt-1 input"
+            className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm ${
+              errors.email ? 'border-red-300' : ''
+            }`}
             required
           />
           {errors.email && (
@@ -53,7 +62,9 @@ const MetadataForm = ({ formData, onChange, errors }) => {
             name="companyName"
             value={formData.companyName}
             onChange={onChange}
-            className="mt-1 input"
+            className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm ${
+              errors.companyName ? 'border-red-300' : ''
+            }`}
             required
           />
           {errors.companyName && (
@@ -71,7 +82,9 @@ const MetadataForm = ({ formData, onChange, errors }) => {
             name="websiteUrl"
             value={formData.websiteUrl}
             onChange={onChange}
-            className="mt-1 input"
+            className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm ${
+              errors.websiteUrl ? 'border-red-300' : ''
+            }`}
             placeholder="https://example.com"
             required
           />
@@ -80,7 +93,16 @@ const MetadataForm = ({ formData, onChange, errors }) => {
           )}
         </div>
       </div>
-    </div>
+
+      <div className="mt-6">
+        <button
+          type="submit"
+          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+        >
+          Start Quiz
+        </button>
+      </div>
+    </form>
   );
 };
 

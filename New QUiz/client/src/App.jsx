@@ -11,10 +11,26 @@ function App() {
     name: '',
     email: '',
     companyName: '',
-    website: '',
+    websiteUrl: '', // Changed from website to websiteUrl to match MetadataForm
   });
   const [quizResults, setQuizResults] = useState(null);
   const [error, setError] = useState(null);
+  const [formErrors, setFormErrors] = useState({});
+
+  const handleMetadataChange = (e) => {
+    const { name, value } = e.target;
+    setMetadata(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    // Clear error when field is modified
+    if (formErrors[name]) {
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: null
+      }));
+    }
+  };
 
   const handleMetadataSubmit = (data) => {
     setMetadata(data);
@@ -60,7 +76,12 @@ function App() {
           
           <div className="px-4 py-6 sm:px-0">
             {step === 'metadata' && (
-              <MetadataForm onSubmit={handleMetadataSubmit} />
+              <MetadataForm 
+                formData={metadata}
+                onChange={handleMetadataChange}
+                errors={formErrors}
+                onSubmit={handleMetadataSubmit}
+              />
             )}
             
             {step === 'quiz' && (
