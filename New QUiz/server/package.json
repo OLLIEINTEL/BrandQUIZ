@@ -1,12 +1,14 @@
 {
   "name": "brand-quiz-functions",
   "version": "1.0.0",
+  "private": true,
   "description": "Netlify Functions for Brand Archetype Quiz",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
+    "@netlify/functions": "^2.0.0",
     "openai": "^4.20.1"
   }
 } 

@@ -1,10 +1,11 @@
 [build]
-  base = "New QUiz"
-  command = "cd client && npm install && npm run build"
+  base = "."
+  command = "cd client && npm install && cd ../server && npm install && cd ../client && npm run build"
   publish = "client/dist"
 
 [functions]
   directory = "server/functions"
+  node_bundler = "esbuild"
 
 [[redirects]]
   from = "/api/*"
