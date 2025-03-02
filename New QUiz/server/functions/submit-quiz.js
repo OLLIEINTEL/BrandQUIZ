@@ -82,7 +82,7 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    console.log('Debug - Received event body:', event.body); // Debug log
+    console.log('Debug - Received event body:', event.body);
 
     // Parse the incoming request body
     const data = JSON.parse(event.body);
@@ -90,21 +90,38 @@ exports.handler = async (event, context) => {
 
     const { metadata, answers } = data;
 
-    // Enhanced validation
-    if (!metadata || typeof metadata !== 'object') {
-      console.error('Invalid metadata:', metadata);
+    // Validate metadata structure
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+      console.error('Invalid metadata structure:', metadata);
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({ 
           success: false, 
-          message: 'Invalid metadata format' 
+          message: 'Invalid metadata structure' 
         }),
       };
     }
 
+    // Validate required metadata fields
+    const requiredMetadataFields = ['name', 'email', 'companyName', 'websiteUrl'];
+    const missingFields = requiredMetadataFields.filter(field => !metadata[field] || typeof metadata[field] !== 'string' || !metadata[field].trim());
+    
+    if (missingFields.length > 0) {
+      console.error('Missing or invalid metadata fields:', missingFields);
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ 
+          success: false, 
+          message: `Missing or invalid metadata fields: ${missingFields.join(', ')}` 
+        }),
+      };
+    }
+
+    // Validate answers array
     if (!answers || !Array.isArray(answers) || answers.length === 0) {
-      console.error('Invalid answers:', answers);
+      console.error('Invalid answers array:', answers);
       return {
         statusCode: 400,
         headers,
@@ -115,30 +132,40 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Validate required metadata fields
-    const requiredMetadataFields = ['name', 'email', 'companyName', 'websiteUrl'];
-    const missingFields = requiredMetadataFields.filter(field => !metadata[field]);
-    
-    if (missingFields.length > 0) {
-      console.error('Missing metadata fields:', missingFields);
+    // Validate each answer object
+    const invalidAnswers = answers.filter(answer => 
+      !answer.id || !answer.question || !answer.answer || !answer.answerText ||
+      typeof answer.id !== 'string' || 
+      typeof answer.question !== 'string' || 
+      typeof answer.answer !== 'string' || 
+      typeof answer.answerText !== 'string'
+    );
+
+    if (invalidAnswers.length > 0) {
+      console.error('Invalid answer objects found:', invalidAnswers);
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({ 
           success: false, 
-          message: `Missing required metadata fields: ${missingFields.join(', ')}` 
+          message: 'One or more answers are missing required fields or have invalid format' 
         }),
       };
     }
 
-    // Analyze the quiz results
+    // Analyze the quiz results with validated data
     const analysis = await analyzeQuizResults(answers);
     console.log('Debug - Analysis result:', JSON.stringify(analysis, null, 2));
 
     // Prepare the response
     const response = {
       success: true,
-      metadata,
+      metadata: {
+        name: metadata.name.trim(),
+        email: metadata.email.trim(),
+        companyName: metadata.companyName.trim(),
+        websiteUrl: metadata.websiteUrl.trim()
+      },
       result: analysis,
       timestamp: new Date().toISOString(),
     };

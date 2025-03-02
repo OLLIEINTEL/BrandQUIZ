@@ -25,12 +25,30 @@ export const submitQuiz = async (quizData) => {
       throw new Error('Quiz answers must be a non-empty array');
     }
 
+    // Serialize the data to remove any prototype chain or undefined values
+    const serializedData = {
+      metadata: {
+        name: quizData.metadata.name || '',
+        email: quizData.metadata.email || '',
+        companyName: quizData.metadata.companyName || '',
+        websiteUrl: quizData.metadata.websiteUrl || ''
+      },
+      answers: quizData.answers.map(answer => ({
+        id: answer.id || '',
+        question: answer.question || '',
+        answer: answer.answer || '',
+        answerText: answer.answerText || ''
+      }))
+    };
+
+    console.log('Debug - Serialized data:', JSON.stringify(serializedData, null, 2));
+
     const response = await fetch(`${API_BASE_URL}/submit-quiz`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(quizData),
+      body: JSON.stringify(serializedData),
     });
     
     const contentType = response.headers.get('content-type');
